@@ -1,6 +1,6 @@
 import javax.swing.*;
 
-public class Main {
+public class    Main {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             JFrame frame = new JFrame("OrderUp - MultiScreen");
@@ -8,7 +8,7 @@ public class Main {
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             frame.setLocationRelativeTo(null);
 
-            // Mulai dengan Screen A
+            // Start with Screen A
             frame.setContentPane(new ScreenA(frame));
             frame.setVisible(true);
         });

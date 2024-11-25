@@ -1,20 +1,14 @@
 import javax.swing.*;
 import java.awt.*;
-import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.util.Locale;
 
-public class ScreenB extends JFrame {
-
-    private JLabel totalLabel;
-    private DefaultListModel<String> orderListModel; // Model untuk daftar pesanan
-    private JList<String> orderList;
-
+public class ScreenB extends JPanel {
     private JPanel itemPanel;
-    private JPanel categoryPanel;
+    private JTextArea orderSummaryArea; // Untuk daftar pesanan
+    private JLabel totalLabel;         // Untuk total harga
 
     private final String[] items = {"Burger", "Pizza", "Fries", "Soda", "Water", "Juice"};
-    private final String[] categories = {"Food", "Drinks"};
     private final int[] prices = {50000, 80000, 30000, 20000, 10000, 15000};
     private final String[] imagePaths = {
             "/images/burger.png",
@@ -24,97 +18,100 @@ public class ScreenB extends JFrame {
             "/images/water.png",
             "/images/juice.png"
     };
-    private final String[] itemCategories = {"Food", "Food", "Food", "Drinks", "Drinks", "Drinks"};
-
-    private int[] quantities = new int[items.length]; // Array untuk menyimpan kuantitas tiap item
-    private NumberFormat currencyFormatter = NumberFormat.getCurrencyInstance(new Locale("id", "ID"));
+    private final String[] categories = {"Makanan", "Minuman"};
+    private final String[] itemCategories = {"Makanan", "Makanan", "Makanan", "Minuman", "Minuman", "Minuman"};
 
     public ScreenB(JFrame frame) {
-        setTitle("OrderUp");
-        setSize(900, 600);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+        setBackground(new Color(240, 248, 255));
 
-        JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
-        mainPanel.setBackground(new Color(240, 248, 255));
-
-        // Panel kategori (tombol kategori)
-        categoryPanel = new JPanel();
+        // Panel kategori
+        JPanel categoryPanel = new JPanel();
         categoryPanel.setLayout(new BoxLayout(categoryPanel, BoxLayout.X_AXIS));
         categoryPanel.setBackground(new Color(220, 220, 220));
-        categoryPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Padding
+        categoryPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
+        // Tambahkan tombol kategori
         for (String category : categories) {
             JButton categoryButton = new JButton(category);
-            styleButton(categoryButton, new Color(70, 130, 180), Color.WHITE);
+            categoryButton.setFont(new Font("Arial", Font.BOLD, 14));
+            categoryButton.setBackground(new Color(70, 130, 180));
+            categoryButton.setForeground(Color.WHITE);
             categoryButton.addActionListener(e -> loadCategoryItems(category));
-            categoryPanel.add(Box.createHorizontalStrut(10)); // Spasi antar tombol
             categoryPanel.add(categoryButton);
+            categoryPanel.add(Box.createHorizontalStrut(10)); // Spasi antar tombol
         }
 
-        // Panel daftar item (menu)
-        itemPanel = new JPanel(new GridLayout(2, 2, 10, 10));
-        itemPanel.setBorder(BorderFactory.createTitledBorder(null, "Available Items",
-                javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION,
-                javax.swing.border.TitledBorder.DEFAULT_POSITION,
-                new Font("Arial", Font.BOLD, 14), Color.DARK_GRAY));
+        // Panel item
+        itemPanel = new JPanel(new GridLayout(2, 3, 10, 10));
         itemPanel.setBackground(Color.WHITE);
 
-        // Tombol kembali ke Screen A
-        JButton backButton = new JButton("Back to Home");
+        // Panel pesanan
+        JPanel orderPanel = createOrderPanel();
+
+        // Tombol kembali
+        JButton backButton = new JButton("Back");
         backButton.setFont(new Font("Arial", Font.BOLD, 14));
         backButton.setBackground(new Color(255, 69, 0));
         backButton.setForeground(Color.WHITE);
         backButton.addActionListener(e -> {
-            // Pindah ke Screen B
             frame.setContentPane(new ScreenA(frame));
             frame.revalidate();
         });
 
-        JPanel backButtonPanel = new JPanel();
-        backButtonPanel.add(backButton);
+        // Tombol ulang (reset pesanan)
+        JButton resetButton = new JButton("Ulang");
+        resetButton.setFont(new Font("Arial", Font.BOLD, 14));
+        resetButton.setBackground(new Color(70, 130, 180));
+        resetButton.setForeground(Color.WHITE);
+        resetButton.addActionListener(e -> {
+            // Reset pesanan di OrderManager
+            OrderManager.getInstance().clearOrders();
 
-        // Tambahkan komponen ke Screen B
+            // Reset semua komponen kuantitas
+            for (Component component : itemPanel.getComponents()) {
+                if (component instanceof JPanel) {
+                    JPanel menuItemPanel = (JPanel) component;
+                    for (Component child : menuItemPanel.getComponents()) {
+                        if (child instanceof JPanel) {
+                            JPanel controlPanel = (JPanel) child;
+                            for (Component controlChild : controlPanel.getComponents()) {
+                                if (controlChild instanceof JLabel) {
+                                    JLabel quantityLabel = (JLabel) controlChild;
+                                    if (quantityLabel.getText().matches("\\d+")) { // Jika teks adalah angka
+                                        quantityLabel.setText("0"); // Reset ke 0
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Perbarui ringkasan pesanan
+            updateOrderSummary();
+        });
+
+
+        JPanel backButtonPanel = new JPanel();
+        backButtonPanel.add(resetButton); // Tambahkan tombol ulang
+        backButtonPanel.add(backButton);  // Tambahkan tombol kembali
+
+        // Tambahkan panel kategori, item, pesanan, dan tombol kembali
         add(categoryPanel, BorderLayout.NORTH);
         add(itemPanel, BorderLayout.CENTER);
-//        add(orderPanel, BorderLayout.WEST);
+        add(orderPanel, BorderLayout.EAST);
         add(backButtonPanel, BorderLayout.SOUTH);
 
-        loadCategoryItems("Food"); // Muat kategori pertama secara default
-
-        // Panel ringkasan pesanan
-        JPanel orderPanel = new JPanel(new BorderLayout());
-        orderPanel.setBorder(BorderFactory.createTitledBorder(null, "Order Summary",
-                javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION,
-                javax.swing.border.TitledBorder.DEFAULT_POSITION,
-                new Font("Arial", Font.BOLD, 14), Color.DARK_GRAY));
-        orderPanel.setBackground(Color.WHITE);
-
-        orderListModel = new DefaultListModel<>();
-        orderList = new JList<>(orderListModel);
-        JScrollPane scrollPane = new JScrollPane(orderList);
-        orderPanel.add(scrollPane, BorderLayout.CENTER);
-
-        totalLabel = new JLabel("Total: Rp0");
-        totalLabel.setFont(new Font("Arial", Font.BOLD, 16));
-        totalLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-        totalLabel.setForeground(new Color(0, 0, 128));
-        orderPanel.add(totalLabel, BorderLayout.SOUTH);
-
-        // Tambahkan ke panel utama
-        mainPanel.add(categoryPanel, BorderLayout.NORTH);
-        mainPanel.add(itemPanel, BorderLayout.CENTER);
-        mainPanel.add(orderPanel, BorderLayout.WEST);
-
-        add(mainPanel);
-        setVisible(true);
+        // Muat kategori pertama secara default
+        loadCategoryItems("Makanan");
     }
 
     private void loadCategoryItems(String category) {
         itemPanel.removeAll(); // Bersihkan itemPanel sebelum menambahkan item baru
         for (int i = 0; i < items.length; i++) {
             if (itemCategories[i].equals(category)) {
-                JPanel menuItemPanel = createMenuItemPanel(i);
+                JPanel menuItemPanel = MenuItemFactory.createMenuItem(items[i], prices[i], imagePaths[i], this::updateOrderSummary);
                 itemPanel.add(menuItemPanel);
             }
         }
@@ -122,100 +119,77 @@ public class ScreenB extends JFrame {
         itemPanel.repaint();
     }
 
-    private JPanel createMenuItemPanel(int index) {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBackground(Color.WHITE);
-        panel.setBorder(BorderFactory.createLineBorder(Color.GRAY));
+    private JPanel createOrderPanel() {
+        JPanel orderPanel = new JPanel(new BorderLayout());
+        orderPanel.setBorder(BorderFactory.createTitledBorder(null, "Order Summary",
+                javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION,
+                javax.swing.border.TitledBorder.DEFAULT_POSITION,
+                new Font("Arial", Font.BOLD, 14), Color.DARK_GRAY));
+        orderPanel.setBackground(Color.WHITE);
 
-        // Gambar menu
-        JLabel imageLabel = new JLabel();
-        imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        try {
-            ImageIcon icon = new ImageIcon(getClass().getResource(imagePaths[index]));
-            Image img = icon.getImage().getScaledInstance(120, 120, Image.SCALE_SMOOTH);
-            imageLabel.setIcon(new ImageIcon(img));
-        } catch (Exception e) {
-            imageLabel.setText("Image not found");
-            imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        }
+        orderSummaryArea = new JTextArea(10, 20);
+        orderSummaryArea.setEditable(false);
+        orderSummaryArea.setFont(new Font("Arial", Font.PLAIN, 14));
 
-        // Nama dan harga item
-        JLabel textLabel = new JLabel("<html><center>" + items[index] + "<br>" + currencyFormatter.format(prices[index]) + "</center></html>");
-        textLabel.setFont(new Font("Arial", Font.PLAIN, 14));
-        textLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        totalLabel = new JLabel("Total: Rp0");
+        totalLabel.setFont(new Font("Arial", Font.BOLD, 16));
+        totalLabel.setHorizontalAlignment(SwingConstants.RIGHT);
 
-        // Panel tombol minus, plus, delete, dan label kuantitas
-        JPanel controlPanel = new JPanel(new FlowLayout());
-        JButton minusButton = new JButton("-");
-        JButton plusButton = new JButton("+");
-        JButton deleteButton = new JButton("Delete");
-        JLabel quantityLabel = new JLabel("0");
+        orderPanel.add(new JScrollPane(orderSummaryArea), BorderLayout.CENTER);
+        orderPanel.add(totalLabel, BorderLayout.SOUTH);
 
-        // Style tombol
-        styleButton(minusButton, new Color(255, 165, 0), Color.WHITE);
-        styleButton(plusButton, new Color(0, 128, 0), Color.WHITE);
-        styleButton(deleteButton, new Color(255, 69, 0), Color.WHITE);
+        return orderPanel;
+    }
 
-        // Event listener tombol minus
-        minusButton.addActionListener(e -> {
-            if (quantities[index] > 0) {
-                quantities[index]--;
-                quantityLabel.setText(String.valueOf(quantities[index]));
-                updateOrderList();
+    public void updateOrderSummary() {
+        OrderManager orderManager = OrderManager.getInstance();
+        StringBuilder foodSummary = new StringBuilder("Makanan:\n");
+        StringBuilder drinkSummary = new StringBuilder("Minuman:\n");
+        int[] total = {0}; // Gunakan array untuk menyimpan nilai total
+
+        // Pemformat angka untuk mata uang Indonesia
+        NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(new Locale("id", "ID"));
+
+        // Loop melalui pesanan dan hitung total langsung dari kuantitas
+        orderManager.getOrders().forEach((item, quantity) -> {
+            if (quantity > 0) {
+                final int index = getItemIndex(item); // Simpan index sebagai final
+                if (index != -1) { // Cek jika index valid
+                    final int price = prices[index]; // Harga harus final
+                    int subtotal = quantity * price; // Subtotal dihitung berdasarkan kuantitas
+                    String formattedLine = item + " x " + quantity + " = " + currencyFormat.format(subtotal) + "\n";
+                    total[0] += subtotal; // Tambahkan ke total keseluruhan
+
+                    // Tambahkan ke kategori yang sesuai
+                    if (itemCategories[index].equals("Makanan")) {
+                        foodSummary.append(formattedLine);
+                    } else if (itemCategories[index].equals("Minuman")) {
+                        drinkSummary.append(formattedLine);
+                    }
+                }
             }
         });
 
-        // Event listener tombol plus
-        plusButton.addActionListener(e -> {
-            quantities[index]++;
-            quantityLabel.setText(String.valueOf(quantities[index]));
-            updateOrderList();
-        });
+        // Gabungkan ringkasan makanan dan minuman
+        StringBuilder summary = new StringBuilder();
+        if (foodSummary.length() > "Makanan:\n".length()) {
+            summary.append(foodSummary).append("\n");
+        }
+        if (drinkSummary.length() > "Minuman:\n".length()) {
+            summary.append(drinkSummary);
+        }
 
-        // Event listener tombol delete
-        deleteButton.addActionListener(e -> {
-            quantities[index] = 0;
-            quantityLabel.setText("0");
-            updateOrderList();
-        });
-
-        // Tambahkan tombol dan label ke panel kontrol
-        controlPanel.add(minusButton);
-        controlPanel.add(quantityLabel);
-        controlPanel.add(plusButton);
-        controlPanel.add(deleteButton);
-
-        // Tambahkan komponen ke panel utama
-        panel.add(imageLabel, BorderLayout.CENTER);
-        panel.add(textLabel, BorderLayout.NORTH);
-        panel.add(controlPanel, BorderLayout.SOUTH);
-
-        return panel;
+        // Update UI
+        orderSummaryArea.setText(summary.toString());
+        totalLabel.setText("Total: " + currencyFormat.format(total[0]));
     }
 
-    private void updateOrderList() {
-        orderListModel.clear();
-        BigDecimal total = BigDecimal.ZERO;
-
+    private int getItemIndex(String itemName) {
         for (int i = 0; i < items.length; i++) {
-            if (quantities[i] > 0) {
-                BigDecimal itemTotal = BigDecimal.valueOf(prices[i]).multiply(BigDecimal.valueOf(quantities[i]));
-                orderListModel.addElement(items[i] + " x " + quantities[i] + " = " + currencyFormatter.format(itemTotal));
-                total = total.add(itemTotal);
+            if (items[i].equals(itemName)) {
+                return i;
             }
         }
-
-        totalLabel.setText("Total: " + currencyFormatter.format(total));
-    }
-
-    private void styleButton(JButton button, Color background, Color foreground) {
-        button.setBackground(background);
-        button.setForeground(foreground);
-        button.setFocusPainted(false);
-        button.setFont(new Font("Arial", Font.BOLD, 14));
-    }
-
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(OrderUpApp::new);
+        return -1; // Item tidak ditemukan
     }
 }
